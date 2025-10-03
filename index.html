@@ -1,125 +1,217 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini RPG 2D con Scroll</title>
-<style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background-color: #66cc66; /* fondo verde */
-  }
-  canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMO RPG 2D - Base con Cámara Centrada</title>
+    <style>
+        /* Estilos para asegurar que el canvas ocupe toda la ventana visible */
+        body {
+            margin: 0;
+            overflow: hidden; /* Evita barras de desplazamiento */
+            background-color: #333; /* Fondo oscuro */
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas {
+            display: block;
+        }
+        /* Estilo para el indicador de coordenadas */
+        #coord-display {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            padding: 5px 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            z-index: 100;
+        }
+    </style>
 </head>
 <body>
-<canvas id="gameCanvas"></canvas>
 
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+    <canvas id="gameCanvas"></canvas>
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+    <div id="coord-display">
+        Coordenadas: (0, 0)
+    </div>
 
-// Tamaño de cada tile
-const TILE_SIZE = 32;
+    <script>
+        // --- CONSTANTES DEL JUEGO ---
+        const TILE_SIZE = 100; // Tamaño de la celda: 100x100 píxeles
+        const PLAYER_COLOR = 'red';
+        const GRASS_COLOR = '#006400'; // Verde Oscuro
+        const WATER_COLOR = '#1e90ff'; // Azul
+        
+        // El mapa de juego (matriz de celdas)
+        // Aumentamos el mapa para que el efecto de la cámara sea visible
+        const GAME_MAP = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+        
+        const MAP_COLS = GAME_MAP[0].length;
+        const MAP_ROWS = GAME_MAP.length;
 
-// Crear un mapa grande (50x50 tiles)
-const MAP_WIDTH = 50;
-const MAP_HEIGHT = 50;
+        // --- INICIALIZACIÓN DEL CANVAS ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const coordDisplay = document.getElementById('coord-display');
+        
+        // Objeto para manejar el desplazamiento de la cámara
+        const camera = {
+            // Desplazamiento en píxeles. Se calcula en el bucle principal.
+            offsetX: 0,
+            offsetY: 0
+        };
 
-// 0 = pasto, 1 = agua
-const map = [];
-for(let y=0; y<MAP_HEIGHT; y++){
-  const row = [];
-  for(let x=0; x<MAP_WIDTH; x++){
-    // Crear algunos lagos aleatorios
-    if(Math.random() < 0.05){
-      row.push(1);
-    } else {
-      row.push(0);
-    }
-  }
-  map.push(row);
-}
+        // Función para ajustar el canvas al tamaño de la ventana
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
 
-// Colores de tiles
-const TILE_COLORS = {
-  0: '#66cc66', // pasto
-  1: '#3399ff'  // agua
-};
+        // Asignar el ajuste de tamaño al cargar y redimensionar la ventana
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-// Personaje
-const player = {
-  x: Math.floor(MAP_WIDTH/2),
-  y: Math.floor(MAP_HEIGHT/2),
-  color: '#ff3333',
-  size: TILE_SIZE
-};
+        // --- OBJETO JUGADOR (PERSONAJE) ---
+        const player = {
+            // Posición en coordenadas de CELDA (columna, fila)
+            x: Math.floor(MAP_COLS / 2), // Inicia en el centro del mapa
+            y: Math.floor(MAP_ROWS / 2),
+            size: TILE_SIZE * 0.8 // Un poco más pequeño que la celda
+        };
 
-// Control de movimiento
-document.addEventListener('keydown', (e) => {
-  let newX = player.x;
-  let newY = player.y;
+        // --- FUNCIONES DE DIBUJO ---
+        
+        // 1. Dibuja el Mapa (Aplica el desplazamiento de la cámara)
+        function drawMap() {
+            for (let y = 0; y < MAP_ROWS; y++) {
+                for (let x = 0; x < MAP_COLS; x++) {
+                    const tileValue = GAME_MAP[y][x];
+                    
+                    // Seleccionar color
+                    ctx.fillStyle = (tileValue === 0) ? GRASS_COLOR : WATER_COLOR;
 
-  switch(e.key){
-    case 'ArrowUp': case 'w': case 'W': newY--; break;
-    case 'ArrowDown': case 's': case 'S': newY++; break;
-    case 'ArrowLeft': case 'a': case 'A': newX--; break;
-    case 'ArrowRight': case 'd': case 'D': newX++; break;
-  }
+                    // Calcular la posición de dibujo aplicando el offset de la cámara
+                    const drawX = x * TILE_SIZE + camera.offsetX;
+                    const drawY = y * TILE_SIZE + camera.offsetY;
 
-  // Limites del mapa
-  if(newX >= 0 && newX < MAP_WIDTH && newY >=0 && newY < MAP_HEIGHT){
-    player.x = newX;
-    player.y = newY;
-  }
+                    // Dibujar el rectángulo de la celda
+                    ctx.fillRect(drawX, drawY, TILE_SIZE, TILE_SIZE);
+                    
+                    // Opcional: Dibujar borde de celda
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                    ctx.strokeRect(drawX, drawY, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
 
-  drawGame();
-});
+        // 2. Dibuja el Personaje (Ahora siempre en el centro de la pantalla)
+        function drawPlayer() {
+            // El personaje siempre se dibuja en el centro visual del canvas
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
 
-// Dibujar el juego con scroll centrado en el jugador
-function drawGame(){
-  // Limpiar pantalla
-  ctx.fillStyle = '#66cc66';
-  ctx.fillRect(0,0,canvas.width, canvas.height);
+            ctx.fillStyle = PLAYER_COLOR;
+            
+            // Dibujar el personaje en el centro de la pantalla
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, player.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Actualizar el indicador de coordenadas
+            coordDisplay.textContent = `Coordenadas: (${player.x}, ${player.y})`;
+        }
 
-  // Calcular offset para centrar jugador
-  const offsetX = canvas.width/2 - player.x*TILE_SIZE - TILE_SIZE/2;
-  const offsetY = canvas.height/2 - player.y*TILE_SIZE - TILE_SIZE/2;
+        // --- LÓGICA DE MOVIMIENTO Y COLISIONES ---
 
-  // Dibujar mapa
-  for(let y=0; y<MAP_HEIGHT; y++){
-    for(let x=0; x<MAP_WIDTH; x++){
-      ctx.fillStyle = TILE_COLORS[map[y][x]];
-      ctx.fillRect(x*TILE_SIZE + offsetX, y*TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
-    }
-  }
+        function movePlayer(dx, dy) {
+            // 1. Calcular la nueva posición de la celda
+            const newX = player.x + dx;
+            const newY = player.y + dy;
 
-  // Dibujar jugador
-  ctx.fillStyle = player.color;
-  ctx.fillRect(canvas.width/2 - TILE_SIZE/2, canvas.height/2 - TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
-}
+            // 2. Detección de Colisiones (Límites del Mapa)
+            const isWithinBounds = (
+                newX >= 0 && newX < MAP_COLS &&
+                newY >= 0 && newY < MAP_ROWS
+            );
 
-// Inicializar
-drawGame();
+            if (isWithinBounds) {
+                // 3. (Futuro: Detección de Colisiones con Celdas Específicas)
+                // Implementación actual: Solo actualizamos si está dentro de los límites
+                player.x = newX;
+                player.y = newY;
+            }
+        }
 
-// Ajustar canvas al cambiar tamaño de ventana
-window.addEventListener('resize', () => {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  drawGame();
-});
-</script>
+        // --- MANEJO DE TECLADO ---
+        document.addEventListener('keydown', (event) => {
+            let dx = 0;
+            let dy = 0;
+
+            switch (event.key) {
+                case 'ArrowUp':
+                case 'w':
+                    dy = -1;
+                    break;
+                case 'ArrowDown':
+                case 's':
+                    dy = 1;
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                    dx = -1;
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                    dx = 1;
+                    break;
+                default:
+                    return;
+            }
+            
+            event.preventDefault(); 
+            movePlayer(dx, dy);
+        });
+
+        // --- BUCLE PRINCIPAL DEL JUEGO (GAME LOOP) ---
+        function gameLoop() {
+            // 1. Limpiar el Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 2. CÁLCULO DE LA CÁMARA
+            // La cámara se calcula de modo que el jugador (en coordenadas de píxeles) 
+            // siempre esté en el centro del canvas.
+            
+            // Posición del jugador en píxeles (si no hubiera offset)
+            const playerPixelX = player.x * TILE_SIZE + (TILE_SIZE / 2);
+            const playerPixelY = player.y * TILE_SIZE + (TILE_SIZE / 2);
+
+            // Calcular el desplazamiento (offset) necesario para centrar al jugador
+            camera.offsetX = (canvas.width / 2) - playerPixelX;
+            camera.offsetY = (canvas.height / 2) - playerPixelY;
+
+            // 3. Dibujar Elementos (Usando el offset de la cámara)
+            drawMap();
+            drawPlayer();
+            
+            // 4. Continuar el Bucle
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Iniciar el juego
+        gameLoop();
+        
+    </script>
 </body>
 </html>
