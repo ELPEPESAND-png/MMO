@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MMO RPG 2D - Base con Cámara Centrada</title>
+    <title>MMO RPG 2D - Mapa 60x40 y Fondo Mundo</title>
     <style>
         /* Estilos para asegurar que el canvas ocupe toda la ventana visible */
         body {
             margin: 0;
             overflow: hidden; /* Evita barras de desplazamiento */
-            background-color: #333; /* Fondo oscuro */
+            /* El color de fondo del body será el color por defecto fuera del canvas */
+            background-color: #333; 
             font-family: Arial, sans-serif;
             color: white;
         }
@@ -40,35 +41,35 @@
         // --- CONSTANTES DEL JUEGO ---
         const TILE_SIZE = 100; // Tamaño de la celda: 100x100 píxeles
         const PLAYER_COLOR = 'red';
-        const GRASS_COLOR = '#006400'; // Verde Oscuro
-        const WATER_COLOR = '#1e90ff'; // Azul
-        
-        // El mapa de juego (matriz de celdas)
-        // Aumentamos el mapa para que el efecto de la cámara sea visible
-        const GAME_MAP = [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        ];
-        
-        const MAP_COLS = GAME_MAP[0].length;
-        const MAP_ROWS = GAME_MAP.length;
+        const GRASS_COLOR = '#006400'; // Pasto
+        const WATER_COLOR = '#1e90ff'; // Agua
+        const VOID_COLOR = '#1a1a1a'; // Color de la textura "Fondo Mundo" (Negro Grisáceo)
 
-        // --- INICIALIZACIÓN DEL CANVAS ---
+        // TAMAÑO DEFINIDO DEL MUNDO
+        const MAP_COLS = 60; // Columnas (Ancho)
+        const MAP_ROWS = 40;  // Filas (Alto)
+        
+        // --- MAPA DE JUEGO (Creación Dinámica) ---
+        // Creamos una matriz de 60x40 inicializada con Pasto (0)
+        const GAME_MAP = [];
+        for (let y = 0; y < MAP_ROWS; y++) {
+            GAME_MAP[y] = [];
+            for (let x = 0; x < MAP_COLS; x++) {
+                // Si está en el borde (ejemplo de agua/bloqueo simple)
+                if (x === 0 || x === MAP_COLS - 1 || y === 0 || y === MAP_ROWS - 1) {
+                    GAME_MAP[y][x] = 1; // 1 para Agua (Colisión)
+                } else {
+                    GAME_MAP[y][x] = 0; // 0 para Pasto
+                }
+            }
+        }
+        
+        // --- INICIALIZACIÓN DEL CANVAS Y CÁMARA ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const coordDisplay = document.getElementById('coord-display');
         
-        // Objeto para manejar el desplazamiento de la cámara
         const camera = {
-            // Desplazamiento en píxeles. Se calcula en el bucle principal.
             offsetX: 0,
             offsetY: 0
         };
@@ -79,24 +80,37 @@
             canvas.height = window.innerHeight;
         }
 
-        // Asignar el ajuste de tamaño al cargar y redimensionar la ventana
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
         // --- OBJETO JUGADOR (PERSONAJE) ---
         const player = {
             // Posición en coordenadas de CELDA (columna, fila)
-            x: Math.floor(MAP_COLS / 2), // Inicia en el centro del mapa
-            y: Math.floor(MAP_ROWS / 2),
-            size: TILE_SIZE * 0.8 // Un poco más pequeño que la celda
+            // Posicionamos al jugador un poco adentro del borde de Agua
+            x: 1, 
+            y: 1,
+            size: TILE_SIZE * 0.8 
         };
 
         // --- FUNCIONES DE DIBUJO ---
         
-        // 1. Dibuja el Mapa (Aplica el desplazamiento de la cámara)
+        // 1. Dibuja el Mapa, incluyendo el "Fondo Mundo"
         function drawMap() {
-            for (let y = 0; y < MAP_ROWS; y++) {
-                for (let x = 0; x < MAP_COLS; x++) {
+            // PASO 1: Dibujar el "Fondo Mundo" en todo el canvas
+            ctx.fillStyle = VOID_COLOR;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // PASO 2: Dibujar las celdas del mapa (solo la porción visible)
+            
+            // Calcular qué celdas son visibles en la pantalla para optimizar el dibujo
+            const startCol = Math.max(0, Math.floor(-camera.offsetX / TILE_SIZE));
+            const endCol = Math.min(MAP_COLS, Math.ceil((canvas.width - camera.offsetX) / TILE_SIZE));
+            const startRow = Math.max(0, Math.floor(-camera.offsetY / TILE_SIZE));
+            const endRow = Math.min(MAP_ROWS, Math.ceil((canvas.height - camera.offsetY) / TILE_SIZE));
+
+
+            for (let y = startRow; y < endRow; y++) {
+                for (let x = startCol; x < endCol; x++) {
                     const tileValue = GAME_MAP[y][x];
                     
                     // Seleccionar color
@@ -116,41 +130,43 @@
             }
         }
 
-        // 2. Dibuja el Personaje (Ahora siempre en el centro de la pantalla)
+        // 2. Dibuja el Personaje (Siempre en el centro de la pantalla)
         function drawPlayer() {
-            // El personaje siempre se dibuja en el centro visual del canvas
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
 
             ctx.fillStyle = PLAYER_COLOR;
             
-            // Dibujar el personaje en el centro de la pantalla
             ctx.beginPath();
             ctx.arc(centerX, centerY, player.size / 2, 0, Math.PI * 2);
             ctx.fill();
             
-            // Actualizar el indicador de coordenadas
-            coordDisplay.textContent = `Coordenadas: (${player.x}, ${player.y})`;
+            coordDisplay.textContent = `Coordenadas: (${player.x}, ${player.y}) - MUNDO: ${MAP_COLS}x${MAP_ROWS}`;
         }
 
         // --- LÓGICA DE MOVIMIENTO Y COLISIONES ---
 
         function movePlayer(dx, dy) {
-            // 1. Calcular la nueva posición de la celda
             const newX = player.x + dx;
             const newY = player.y + dy;
 
-            // 2. Detección de Colisiones (Límites del Mapa)
+            // Detección de Colisiones (Límites del Mapa y Celdas bloqueadas)
             const isWithinBounds = (
                 newX >= 0 && newX < MAP_COLS &&
                 newY >= 0 && newY < MAP_ROWS
             );
 
             if (isWithinBounds) {
-                // 3. (Futuro: Detección de Colisiones con Celdas Específicas)
-                // Implementación actual: Solo actualizamos si está dentro de los límites
-                player.x = newX;
-                player.y = newY;
+                const tileType = GAME_MAP[newY][newX];
+                
+                // Si la celda es Pasto (0), permite el movimiento.
+                // Si es Agua (1), bloquea el movimiento.
+                if (tileType === 0) {
+                    player.x = newX;
+                    player.y = newY;
+                }
+                // Nota: Los bordes del mapa 60x40 ahora son Agua (1), por lo que el 
+                // personaje no podrá cruzar las coordenadas 0 y 59 en X, ni 0 y 39 en Y.
             }
         }
 
@@ -186,22 +202,30 @@
 
         // --- BUCLE PRINCIPAL DEL JUEGO (GAME LOOP) ---
         function gameLoop() {
-            // 1. Limpiar el Canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 1. Limpiar el Canvas ya no es necesario, lo hacemos al dibujar el VOID_COLOR
             
             // 2. CÁLCULO DE LA CÁMARA
-            // La cámara se calcula de modo que el jugador (en coordenadas de píxeles) 
-            // siempre esté en el centro del canvas.
-            
-            // Posición del jugador en píxeles (si no hubiera offset)
             const playerPixelX = player.x * TILE_SIZE + (TILE_SIZE / 2);
             const playerPixelY = player.y * TILE_SIZE + (TILE_SIZE / 2);
 
             // Calcular el desplazamiento (offset) necesario para centrar al jugador
             camera.offsetX = (canvas.width / 2) - playerPixelX;
             camera.offsetY = (canvas.height / 2) - playerPixelY;
-
-            // 3. Dibujar Elementos (Usando el offset de la cámara)
+            
+            // (Opcional) LIMITAR CÁMARA: Asegura que el "Fondo Mundo" solo aparezca si es necesario.
+            // Si el mapa es más pequeño que la pantalla, no queremos que se mueva.
+            
+            // Límite en X
+            const maxOffsetX = 0;
+            const minOffsetX = canvas.width - (MAP_COLS * TILE_SIZE);
+            camera.offsetX = Math.min(maxOffsetX, Math.max(minOffsetX, camera.offsetX));
+            
+            // Límite en Y
+            const maxOffsetY = 0;
+            const minOffsetY = canvas.height - (MAP_ROWS * TILE_SIZE);
+            camera.offsetY = Math.min(maxOffsetY, Math.max(minOffsetY, camera.offsetY));
+            
+            // 3. Dibujar Elementos
             drawMap();
             drawPlayer();
             
