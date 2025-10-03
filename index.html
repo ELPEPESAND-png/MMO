@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini RPG 2D - Tile-Based</title>
+<style>
+  body {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #222;
+  }
+  canvas {
+    background-color: #88cc88;
+    image-rendering: pixelated;
+    border: 3px solid #000;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="320" height="320"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Tamaño de los tiles
+const TILE_SIZE = 32;
+// Mapa 10x10
+const MAP_WIDTH = 10;
+const MAP_HEIGHT = 10;
+
+// Crear mapa simple (0 = pasto, 1 = agua)
+const map = [
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,1,1,0,0,0,1,1,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,1,1,0,0,0,1,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,1,0,0,1,1,0,0,0,0],
+  [0,0,0,0,0,0,0,1,1,0],
+  [0,0,1,0,0,0,0,0,0,0],
+  [0,0,0,0,1,1,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0]
+];
+
+// Colores para los tiles
+const TILE_COLORS = {
+  0: '#66cc66', // pasto
+  1: '#3399ff'  // agua
+};
+
+// Personaje
+const player = {
+  x: 0, // coordenadas de tile
+  y: 0,
+  color: '#ff3333',
+  size: TILE_SIZE
+};
+
+// Dibujar el mapa
+function drawMap() {
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      ctx.fillStyle = TILE_COLORS[map[y][x]];
+      ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    }
+  }
+}
+
+// Dibujar personaje
+function drawPlayer() {
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x * TILE_SIZE, player.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+}
+
+// Control de movimiento
+document.addEventListener('keydown', (e) => {
+  let newX = player.x;
+  let newY = player.y;
+
+  switch(e.key) {
+    case 'ArrowUp':
+    case 'w':
+    case 'W':
+      newY--;
+      break;
+    case 'ArrowDown':
+    case 's':
+    case 'S':
+      newY++;
+      break;
+    case 'ArrowLeft':
+    case 'a':
+    case 'A':
+      newX--;
+      break;
+    case 'ArrowRight':
+    case 'd':
+    case 'D':
+      newX++;
+      break;
+  }
+
+  // Limites del mapa
+  if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT) {
+    player.x = newX;
+    player.y = newY;
+  }
+
+  drawGame();
+});
+
+// Dibujar todo
+function drawGame() {
+  drawMap();
+  drawPlayer();
+}
+
+// Inicializar juego
+drawGame();
+</script>
+</body>
+</html>
