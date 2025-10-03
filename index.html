@@ -3,51 +3,57 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini RPG 2D - Tile-Based</title>
+<title>Mini RPG 2D con Scroll</title>
 <style>
-  body {
+  html, body {
     margin: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background-color: #222;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #66cc66; /* fondo verde */
   }
   canvas {
-    background-color: #88cc88;
+    display: block;
+    width: 100%;
+    height: 100%;
     image-rendering: pixelated;
-    border: 3px solid #000;
   }
 </style>
 </head>
 <body>
-<canvas id="gameCanvas" width="320" height="320"></canvas>
+<canvas id="gameCanvas"></canvas>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Tamaño de los tiles
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Tamaño de cada tile
 const TILE_SIZE = 32;
-// Mapa 10x10
-const MAP_WIDTH = 10;
-const MAP_HEIGHT = 10;
 
-// Crear mapa simple (0 = pasto, 1 = agua)
-const map = [
-  [0,0,0,0,0,0,0,0,0,0],
-  [0,1,1,0,0,0,1,1,0,0],
-  [0,0,0,0,0,0,0,0,0,0],
-  [0,0,1,1,0,0,0,1,0,0],
-  [0,0,0,0,0,0,0,0,0,0],
-  [0,1,0,0,1,1,0,0,0,0],
-  [0,0,0,0,0,0,0,1,1,0],
-  [0,0,1,0,0,0,0,0,0,0],
-  [0,0,0,0,1,1,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0]
-];
+// Crear un mapa grande (50x50 tiles)
+const MAP_WIDTH = 50;
+const MAP_HEIGHT = 50;
 
-// Colores para los tiles
+// 0 = pasto, 1 = agua
+const map = [];
+for(let y=0; y<MAP_HEIGHT; y++){
+  const row = [];
+  for(let x=0; x<MAP_WIDTH; x++){
+    // Crear algunos lagos aleatorios
+    if(Math.random() < 0.05){
+      row.push(1);
+    } else {
+      row.push(0);
+    }
+  }
+  map.push(row);
+}
+
+// Colores de tiles
 const TILE_COLORS = {
   0: '#66cc66', // pasto
   1: '#3399ff'  // agua
@@ -55,58 +61,26 @@ const TILE_COLORS = {
 
 // Personaje
 const player = {
-  x: 0, // coordenadas de tile
-  y: 0,
+  x: Math.floor(MAP_WIDTH/2),
+  y: Math.floor(MAP_HEIGHT/2),
   color: '#ff3333',
   size: TILE_SIZE
 };
-
-// Dibujar el mapa
-function drawMap() {
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      ctx.fillStyle = TILE_COLORS[map[y][x]];
-      ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-    }
-  }
-}
-
-// Dibujar personaje
-function drawPlayer() {
-  ctx.fillStyle = player.color;
-  ctx.fillRect(player.x * TILE_SIZE, player.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-}
 
 // Control de movimiento
 document.addEventListener('keydown', (e) => {
   let newX = player.x;
   let newY = player.y;
 
-  switch(e.key) {
-    case 'ArrowUp':
-    case 'w':
-    case 'W':
-      newY--;
-      break;
-    case 'ArrowDown':
-    case 's':
-    case 'S':
-      newY++;
-      break;
-    case 'ArrowLeft':
-    case 'a':
-    case 'A':
-      newX--;
-      break;
-    case 'ArrowRight':
-    case 'd':
-    case 'D':
-      newX++;
-      break;
+  switch(e.key){
+    case 'ArrowUp': case 'w': case 'W': newY--; break;
+    case 'ArrowDown': case 's': case 'S': newY++; break;
+    case 'ArrowLeft': case 'a': case 'A': newX--; break;
+    case 'ArrowRight': case 'd': case 'D': newX++; break;
   }
 
   // Limites del mapa
-  if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT) {
+  if(newX >= 0 && newX < MAP_WIDTH && newY >=0 && newY < MAP_HEIGHT){
     player.x = newX;
     player.y = newY;
   }
@@ -114,14 +88,38 @@ document.addEventListener('keydown', (e) => {
   drawGame();
 });
 
-// Dibujar todo
-function drawGame() {
-  drawMap();
-  drawPlayer();
+// Dibujar el juego con scroll centrado en el jugador
+function drawGame(){
+  // Limpiar pantalla
+  ctx.fillStyle = '#66cc66';
+  ctx.fillRect(0,0,canvas.width, canvas.height);
+
+  // Calcular offset para centrar jugador
+  const offsetX = canvas.width/2 - player.x*TILE_SIZE - TILE_SIZE/2;
+  const offsetY = canvas.height/2 - player.y*TILE_SIZE - TILE_SIZE/2;
+
+  // Dibujar mapa
+  for(let y=0; y<MAP_HEIGHT; y++){
+    for(let x=0; x<MAP_WIDTH; x++){
+      ctx.fillStyle = TILE_COLORS[map[y][x]];
+      ctx.fillRect(x*TILE_SIZE + offsetX, y*TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
+    }
+  }
+
+  // Dibujar jugador
+  ctx.fillStyle = player.color;
+  ctx.fillRect(canvas.width/2 - TILE_SIZE/2, canvas.height/2 - TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
 }
 
-// Inicializar juego
+// Inicializar
 drawGame();
+
+// Ajustar canvas al cambiar tamaño de ventana
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  drawGame();
+});
 </script>
 </body>
 </html>
